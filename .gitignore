@@ -1,0 +1,5 @@
+.env
+.env.*
+03-media/
+node_modules/
+.DS_Store

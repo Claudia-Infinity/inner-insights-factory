@@ -3,3 +3,5 @@
 03-media/
 node_modules/
 .DS_Store
+01-scripts/_drive/
+01-scripts/*.json

@@ -1,0 +1,29 @@
+{
+  "_notes": "Avatars live in the Runway DEVELOPER org (dev.runwayml.com), not the web app. Recreate via POST /v1/avatars from a portrait still. avatar_videos output is LANDSCAPE 1088x704 with the portrait pillarboxed; pipeline crops centre 396x704 -> 1080x1920 (optional /v1/video_upscale pass). Cost observed: 2 credits per ~17s video, 8 credits per gen4_image portrait.",
+  "avatars": {
+    "luna": {
+      "brand": "inner-insights",
+      "persona": "otherworldly / philosophical / spiritual",
+      "pillars": ["spirituality", "philosophy", "mind"],
+      "runwayAvatarId": "b01ad0e6-b4b9-4e40-b274-d3141fb4b6b8",
+      "referenceImage": "03-media/luna-portrait-v1.png",
+      "referenceTaskId": "938002a1-d638-4ee2-811f-f3715f7faa43",
+      "voice": { "type": "preset", "presetId": "maya" },
+      "voiceNote": "Claudia's pick is maya. Avatar was created with preset luna; override per video with speech.voice. ElevenLabs-backed custom voice possible via POST /v1/voices.",
+      "tests": {
+        "luna-test1-voice-luna.mp4": "task ed890d32-c268-47ae-9236-124b14f9480c",
+        "luna-test2-voice-maya.mp4": "task 18a370bb-6105-4ead-91a6-f202d4f59346",
+        "luna-test2-vertical-crop.mp4": "ffmpeg crop=396:704:346:0,scale=1080:1920"
+      }
+    },
+    "claudia": {
+      "brand": "inner-insights",
+      "persona": "warm / healing (her existing Runway web-app avatar)",
+      "runwayAvatarId": null,
+      "referenceImage": null,
+      "voice": { "type": "preset", "presetId": "maya" },
+      "blockedOn": "portrait still export from her web-app avatar"
+    }
+  },
+  "output": { "crop": "396:704:346:0", "scale": "1080x1920", "safeZone": { "topPct": 14, "bottomPct": 20 } }
+}

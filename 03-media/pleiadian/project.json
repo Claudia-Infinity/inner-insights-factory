@@ -1,0 +1,13 @@
+{
+  "title": "A Future Worth Building",
+  "split": 22.3,
+  "brolls": [
+    {"file": "broll1.mp4", "start": 7.0, "dur": 4.6, "line": "Imagine communities where no one is discarded",
+     "still_prompt": "Cinematic film still, golden hour: an elderly man and a young woman of different backgrounds laughing together at a long outdoor table shared by a warm, diverse community, string lights, children in the background, soft backlight, shallow depth of field, photorealistic, 35mm, tender and hopeful, no text.",
+     "motion_prompt": "Gentle natural motion: they laugh softly, warm light flickers, people move slowly in the background, slow cinematic push-in, photorealistic, no camera shake."},
+    {"file": "broll2.mp4", "start": 20.4, "dur": 4.2, "line": "Imagine leadership guided by wisdom and compassion / Such a future begins",
+     "still_prompt": "Cinematic film still at sunrise: a young girl cupping a small green seedling in her hands, first golden light on her face, eyes full of wonder, an adult's hands gently supporting hers from behind, soft bokeh field, photorealistic, 50mm, hopeful, no text.",
+     "motion_prompt": "The girl looks down at the seedling then slowly up toward the light, a soft breeze moves her hair, golden light brightens, very slow push-in, photorealistic, no camera shake."}
+  ],
+  "end": {"line": "We believe in you."}
+}

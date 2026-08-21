@@ -91,7 +91,7 @@ def with_alpha(img, a):
     if a >= 0.999: return img
     r, g, b, al = img.split(); return Image.merge("RGBA", (r, g, b, al.point(lambda v: int(v * a))))
 
-def render_overlay(out, total, V1, S, words, title, world_png):
+def render_overlay(out, total, V1, S, words, title, world_png, endcfg={}):
     rng = random.Random(7)
     sprites = {r: glow_sprite(r) for r in (5, 8, 12, 18)}
     parts = [{"x": rng.uniform(0, W), "y": rng.uniform(0, H), "r": rng.choice((5, 5, 8, 8, 12, 18)), "v": rng.uniform(14, 40),
@@ -106,7 +106,7 @@ def render_overlay(out, total, V1, S, words, title, world_png):
             caps.append((w["s"], max(e, w["s"] + 0.05), g, wi))
     cache = {}
     world = Image.open(world_png).convert("RGB")
-    end1 = text_img(["You are loved."], 92, 2, fill=(255, 252, 245, 255), shadow=120)
+    end1 = text_img([endcfg.get("line", "You are loved.")], 92, 2, fill=(255, 252, 245, 255), shadow=120)
     end2 = text_img(["comment  “I choose love”"], 36, 2, 2, fill=(255, 245, 225, 245), shadow=220)
     end3 = text_img(["@claudiainfinityai   ·   The Collective"], 28, 0, 4, fill=(255, 245, 225, 225), shadow=220)
     end_start = V1 + HOLD; nfr = int(round(total * FPS))
@@ -147,14 +147,17 @@ def render_overlay(out, total, V1, S, words, title, world_png):
 
 def main():
     d, S, out = sys.argv[1], float(sys.argv[2]), sys.argv[3]
-    meta = json.load(open(f"{d}/voice.align.json")); words = words_from_alignment(meta["alignment"]); title = meta["title"]
+    cfg = json.load(open(f"{d}/project.json")) if os.path.exists(f"{d}/project.json") else {}
+    meta = json.load(open(f"{d}/voice.align.json")); words = words_from_alignment(meta["alignment"]); title = cfg.get("title", meta["title"])
     V1 = dur(f"{d}/voice.mp3"); total = V1 + HOLD + ENDCARD
     seg1, seg2 = f"{d}/seg1.mp4", f"{d}/seg2.mp4"
     d1 = dur(seg1); d2 = dur(seg2)
-    b0, b1 = S - BROLL_BEFORE, S + BROLL_AFTER
+    brolls = cfg.get("brolls") or [{"file": "broll.mp4", "start": S - BROLL_BEFORE, "dur": BROLL_BEFORE + BROLL_AFTER}]
+    b0, b1 = brolls[0]["start"], brolls[0]["start"] + brolls[0]["dur"]
     tmp = tempfile.mkdtemp(prefix="hero_"); ov = f"{tmp}/overlay.mov"
-    print("overlay track...", flush=True); render_overlay(ov, total, V1, S, words, title, f"{d}/world.png")
+    print("overlay track...", flush=True); render_overlay(ov, total, V1, S, words, title, f"{d}/world.png", cfg.get("end", {}))
     print("compositing...", flush=True)
+    NB = len(brolls)
     up = f"scale={W}:{H}:flags=lanczos,unsharp=5:5:0.5:5:5:0.0"
     push = (f"scale=w='trunc(iw*(1+0.07*t/{total:.3f})/2)*2':h='trunc(ih*(1+0.07*t/{total:.3f})/2)*2':eval=frame:flags=bicubic,"
             f"crop={W}:{H}:'(iw-{W})/2':'(ih-{H})/2'")
@@ -165,22 +168,22 @@ def main():
         f"[1:v]{up},tpad=stop_duration={total}:stop_mode=clone,trim=duration={total - S:.3f},setpts=PTS-STARTPTS+{S:.3f}/TB[s2]",
         f"[s1][s2]overlay=0:0:eof_action=pass:enable='gte(t,{S:.3f})'[base0]",
         # b-roll over the seam, with soft fades
-        f"[2:v]{up},trim=duration={BROLL_BEFORE + BROLL_AFTER:.3f},setpts=PTS-STARTPTS+{b0:.3f}/TB,format=rgba,fade=t=in:st={b0:.3f}:d=0.45:alpha=1,fade=t=out:st={b1 - 0.55:.3f}:d=0.55:alpha=1[br]",
-        f"[base0][br]overlay=0:0:eof_action=pass[base1]",
+        *[f"[{2+i}:v]{up},trim=duration={b['dur']:.3f},setpts=PTS-STARTPTS+{b['start']:.3f}/TB,format=rgba,fade=t=in:st={b['start']:.3f}:d=0.45:alpha=1,fade=t=out:st={b['start']+b['dur']-0.55:.3f}:d=0.55:alpha=1[br{i}]" for i, b in enumerate(brolls)],
+        *[f"[{'base0' if i == 0 else f'bb{i-1}'}][br{i}]overlay=0:0:eof_action=pass[{'base1' if i == len(brolls)-1 else f'bb{i}'}]" for i in range(len(brolls))],
         f"[base1]{push},{grade}[base2]",
-        f"[base2][3:v]overlay=0:0:eof_action=pass,format=yuv420p[vout]",
+        f"[base2][{NB+2}:v]overlay=0:0:eof_action=pass,format=yuv420p[vout]",
         # audio
-        f"[4:a]highpass=f=70,acompressor=threshold=-18dB:ratio=2.5:attack=15:release=200:makeup=2,aecho=0.85:0.5:38:0.10,apad=pad_dur={HOLD + ENDCARD + 1},asplit[voice][side]",
-        f"[5:a]atrim=duration={total:.3f},asetpts=PTS-STARTPTS,volume=-15dB,afade=t=in:d=2.0,afade=t=out:st={total - 3.0:.3f}:d=3.0[m0]",
+        f"[{NB+3}:a]highpass=f=70,acompressor=threshold=-18dB:ratio=2.5:attack=15:release=200:makeup=2,aecho=0.85:0.5:38:0.10,apad=pad_dur={HOLD + ENDCARD + 1},asplit[voice][side]",
+        f"[{NB+4}:a]atrim=duration={total:.3f},asetpts=PTS-STARTPTS,volume=-15dB,afade=t=in:d=2.0,afade=t=out:st={total - 3.0:.3f}:d=3.0[m0]",
         f"[m0][side]sidechaincompress=threshold=0.02:ratio=5:attack=60:release=900:makeup=1[m1]",
-        f"[6:a]volume=-11dB,adelay=150|150[sbreath]",
-        f"[7:a]volume=-13dB,adelay={int((b0 - 0.35) * 1000)}|{int((b0 - 0.35) * 1000)}[swoosh1]",
-        f"[8:a]volume=-14dB,adelay={int((V1 + HOLD - 1.0) * 1000)}|{int((V1 + HOLD - 1.0) * 1000)}[swoosh2]",
-        f"[9:a]volume=-9dB,afade=t=out:st=5:d=3[sdrone]",
-        f"[10:a]volume=-15dB,adelay={int((V1 + HOLD + 0.3) * 1000)}|{int((V1 + HOLD + 0.3) * 1000)}[sshim]",
+        f"[{NB+5}:a]volume=-11dB,adelay=150|150[sbreath]",
+        f"[{NB+6}:a]volume=-13dB,adelay={int((b0 - 0.35) * 1000)}|{int((b0 - 0.35) * 1000)}[swoosh1]",
+        f"[{NB+7}:a]volume=-14dB,adelay={int((V1 + HOLD - 1.0) * 1000)}|{int((V1 + HOLD - 1.0) * 1000)}[swoosh2]",
+        f"[{NB+8}:a]volume=-9dB,afade=t=out:st=5:d=3[sdrone]",
+        f"[{NB+9}:a]volume=-15dB,adelay={int((V1 + HOLD + 0.3) * 1000)}|{int((V1 + HOLD + 0.3) * 1000)}[sshim]",
         f"[voice][m1][sbreath][swoosh1][swoosh2][sdrone][sshim]amix=inputs=7:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95[aout]",
     ]
-    run(["ffmpeg", "-v", "error", "-y", "-i", seg1, "-i", seg2, "-i", f"{d}/broll.mp4", "-i", ov, "-i", f"{d}/voice.mp3", "-i", f"{d}/music.mp3",
+    run(["ffmpeg", "-v", "error", "-y", "-i", seg1, "-i", seg2, *sum([["-i", f"{d}/{b['file']}"] for b in brolls], []), "-i", ov, "-i", f"{d}/voice.mp3", "-i", f"{d}/music.mp3",
          "-i", f"{d}/sfx-breath.mp3", "-i", f"{d}/sfx-whoosh.mp3", "-i", f"{d}/sfx-whoosh.mp3", "-i", f"{d}/sfx-drone.mp3", "-i", f"{d}/sfx-shimmer.mp3",
          "-filter_complex", ";".join(f), "-map", "[vout]", "-map", "[aout]", "-t", f"{total:.3f}",
          "-c:v", "libx264", "-crf", "17", "-preset", "veryfast", "-r", str(FPS), "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out])
